@@ -1,0 +1,79 @@
+Prequirements :
+
+xine-lib-1.2
+
+Get crystalhd driver and libs, compile and install it :
+
+  cd /usr/src
+  svn co https://crystalhd.svn.sourceforge.net/svnroot/crystalhd/trunk xine-plugin-crystalhd 
+  git clone git://git.wilsonet.com/crystalhd.git/
+  cd crystalhd
+  git checkout 6df10a0599b5adf7e6f08529f0954a3fa24ad0ad
+  cd driver/linux
+  autoconf
+  ./configure
+  make
+  make install
+  cd /usr/src/crystalhd/linux_lib/libcrystalhd
+  make
+  make install
+  cd /usr/src/
+  depmod -a
+  modprobe crystalhd
+
+Let's check - everything is ok ? the driver is loaded ? 
+
+  ls -l /dev/crystalhd
+  crw-rw-rw- 1 root root 251, 0 2010-01-14 21:47 /dev/crystalhd
+
+Have a look in syslog :
+
+[ 2795.927292] Loading crystalhd 3.1.0
+[ 2795.927368] Starting Device:0x1612
+[ 2795.927398] bar0:0xdf800000-0x00010000  bar2:0xdf400000-0x00400000
+[ 2795.929896] i2o_addr:0xfc7e0000   Mapped addr:0xfc800000  
+[ 2795.930192] crystalhd_hw_open: setting up functions, device = Link
+[ 2796.232669] Opening HW. hw:0xf62df200, hw->adp:0xf63bb240
+[ 2796.472620] crystalhd 0000:02:00.0: setting latency timer to 64
+
+Let's compile Plugin libcristalhd
+
+  cd /usr/src/xine-plugin-crystalhd
+  make
+  make install
+
+Let's check again 
+
+  ls -l /usr/lib/xine/plugins/2.0/*crystalhd*
+  -rwxr-xr-x 1 root root 212700 2010-01-14 22:14 /usr/lib/xine/plugins/2.0/xineplug_decode_crystalhd.so
+
+Seems ok. After of xine-ui compiling let's start it and correct .xine/config
+  
+# Priority for crystalhd_decoder
+engine.decoder_priorities.crystalhd_decoder:1
+
+# crystalhd_video: enable extra logging
+# bool, default: 0
+video.crystalhd_decoder.extra_logging:0
+
+# crystalhd_video: enable decoder scaling
+# bool, default: 0
+video.crystalhd_decoder.scaling_enable:1
+
+# crystalhd_video: use threading
+# bool, default: 1
+video.crystalhd_decoder.use_threading:1
+
+# crystalhd_video: scaling width
+# numeric, default: 0
+video.crystalhd_decoder.scaling_width:1280
+
+# crystalhd_video: use full decoder reopen.
+# due a bug in bcm70015 set this to true for bcm70015.
+video.crystalhd_decoder.decoder_reopen:1
+
+# crystalhd_video: on >=50p drop every second frame
+# on >=50p drop every second frame. This is a hack for slow gfx cards.
+video.crystalhd_decoder.decoder_25p_drop:1
+
+
