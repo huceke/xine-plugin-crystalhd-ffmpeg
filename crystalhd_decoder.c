@@ -128,13 +128,11 @@ static void crystalhd_video_render (crystalhd_video_decoder_t *this, image_buffe
  	image_buffer_t *img	= NULL;
 
   if(this->use_threading) {
-    //pthread_mutex_lock(&this->rec_mutex);
 	  ite = xine_list_front(this->image_buffer);
     if(ite!= NULL) {
   	  img	= xine_list_get_value(this->image_buffer, ite);
 		  xine_list_remove(this->image_buffer, ite);
     }
-    //pthread_mutex_unlock(&this->rec_mutex);
   } else {
     img = _img;
   }
@@ -147,6 +145,8 @@ static void crystalhd_video_render (crystalhd_video_decoder_t *this, image_buffe
                				XINE_IMGFMT_YUY2, VO_BOTH_FIELDS | VO_PAN_SCAN_FLAG | this->reset);
 
     this->reset = 0;
+
+    //printf("img->image_bytes %d width %d height %d interlaced %d\n", img->image_bytes, img->width, img->height, img->interlaced);
 
    	yuy2_to_yuy2(
     		  	img->image, img->width * 2,
@@ -162,7 +162,7 @@ static void crystalhd_video_render (crystalhd_video_decoder_t *this, image_buffe
   }
 
   if(img != NULL && this->use_threading) {
-  	_aligned_free(img->image);
+  	free(img->image);
     free(img);
   }
 }
@@ -173,7 +173,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 	BC_STATUS         ret = BC_STS_ERROR;
 	BC_DTS_STATUS     pStatus;
   BC_DTS_PROC_OUT		procOut;
-	unsigned char   	*transferbuff = NULL;
+	//unsigned char   	*transferbuff = NULL;
 	int								decoder_timeout = 16;
   int               mutex_lock = 0;
 
@@ -187,12 +187,14 @@ void* crystalhd_video_rec_thread (void *this_gen) {
       continue;
     }
 
+    /*
     if(this->use_threading) {
       mutex_lock = pthread_mutex_trylock(&this->rec_mutex);
       if(mutex_lock == EBUSY) {
         continue;
       }
     }
+    */
 
 		/* read driver status. we need the frame ready count from it */
     memset(&pStatus, 0, sizeof(BC_DTS_STATUS));
@@ -210,6 +212,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
       if(this->use_threading) {
 			
         /* setup frame transfer structure */
+        /*
 			  procOut.PicInfo.width = this->width;
 			  procOut.PicInfo.height = this->height;
 			  procOut.YbuffSz = this->y_size/4;
@@ -224,14 +227,13 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 			  procOut.Ybuff = transferbuff;
 
 			  procOut.PoutFlags = procOut.PoutFlags & 0xff;
-	
-        //pthread_mutex_lock(&this->rec_mutex);
   			ret = DtsProcOutput(hDevice, decoder_timeout, &procOut);
-        //pthread_mutex_unlock(&this->rec_mutex);
-      } else {	
-        //pthread_mutex_lock(&this->rec_mutex);
+        */
+	
   			ret = DtsProcOutputNoCopy(hDevice, decoder_timeout, &procOut);
-        //pthread_mutex_unlock(&this->rec_mutex);
+
+      } else {	
+  			ret = DtsProcOutputNoCopy(hDevice, decoder_timeout, &procOut);
       }
 
 			/* print statistics */
@@ -242,7 +244,6 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 	       	if ((procOut.PoutFlags & BC_POUT_FLAGS_PIB_VALID) && 
 							(procOut.PoutFlags & BC_POUT_FLAGS_FMT_CHANGE) ) {
 	
-            // Does not work with 0.9.27
 						this->interlaced = (procOut.PicInfo.flags & VDEC_FLAG_INTERLACED_SRC ? 1 : 0);
 						//this->interlaced = (procOut.PicInfo.flags & VDEC_FLAG_FIELDPAIR ? 1 : 0);
 	
@@ -276,12 +277,13 @@ void* crystalhd_video_rec_thread (void *this_gen) {
             if((procOut.PicInfo.picture_number - this->last_image) > 0 ) {
 
               if(this->extra_logging) {
-                fprintf(stderr,"ReadyListCount %d FreeListCount %d PIBMissCount %d picture_number %d gap %d tiemStamp %" PRId64 " YbuffSz %d YBuffDoneSz %d\n",
+                fprintf(stderr,"ReadyListCount %d FreeListCount %d PIBMissCount %d picture_number %d gap %d tiemStamp %" PRId64 " YbuffSz %d YBuffDoneSz %d UVbuffSz %d UVBuffDoneSz %d\n",
 									pStatus.ReadyListCount, pStatus.FreeListCount, pStatus.PIBMissCount, 
 									procOut.PicInfo.picture_number, 
 									procOut.PicInfo.picture_number - this->last_image,
                   procOut.PicInfo.timeStamp,
-                  procOut.YbuffSz, procOut.YBuffDoneSz);
+                  procOut.YbuffSz, procOut.YBuffDoneSz, 
+                  procOut.UVbuffSz, procOut.UVBuffDoneSz);
               }
 
               if((procOut.PicInfo.picture_number - this->last_image) > 1) {
@@ -290,7 +292,6 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 									procOut.PicInfo.picture_number, 
 									procOut.PicInfo.picture_number - this->last_image,
                   procOut.PicInfo.timeStamp);
-							  //xprintf(this->xine, XINE_VERBOSITY_NONE,"Lost frame\n");
               }
 
 							if(procOut.PicInfo.picture_number != this->last_image) {
@@ -308,13 +309,17 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 							/* allocate new image buffer and push it to the image list */
               if(this->use_threading) {
 							  img = malloc(sizeof(image_buffer_t));
-							  img->image = transferbuff;
-							  img->image_bytes = procOut.YbuffSz;
+							  //img->image = transferbuff;
+							  //img->image_bytes = procOut.YbuffSz;
+							  //img->image_bytes = procOut.YBuffDoneSz + procOut.UVbuffSz;
+							  img->image_bytes = this->width * this->height * 2;
+							  img->image = malloc(img->image_bytes);
+                xine_fast_memcpy(img->image, procOut.Ybuff, img->image_bytes);
               } else {
                 memset(&_img, 0 , sizeof(image_buffer_t));
                 img = &_img;
 							  img->image = procOut.Ybuff;
-							  img->image_bytes = procOut.YBuffDoneSz;
+							  img->image_bytes = procOut.YBuffDoneSz + procOut.UVbuffSz;
               }
 
 							img->width = this->width;
@@ -326,7 +331,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 							img->picture_number = procOut.PicInfo.picture_number;
 
               if(this->use_threading) {
-  							transferbuff = NULL;
+  						//	transferbuff = NULL;
 
 		  					xine_list_push_back(this->image_buffer, img);
               } else {
@@ -335,9 +340,9 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 
 						}
 					}
-          if(!this->use_threading) {
+          //if(!this->use_threading) {
             DtsReleaseOutputBuffs(hDevice, NULL, FALSE);
-          }
+          //}
 					break;
         case BC_STS_DEC_NOT_OPEN:
         case BC_STS_DEC_NOT_STARTED:
@@ -353,7 +358,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 		}
 
     if(this->use_threading) {
-      pthread_mutex_unlock(&this->rec_mutex);
+      //pthread_mutex_unlock(&this->rec_mutex);
       msleep(5);
     } else {
       break;
@@ -361,10 +366,10 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 
 	}
 
-  if(transferbuff) {
-	  _aligned_free(transferbuff);
-	  transferbuff = NULL;
-  }
+  //if(transferbuff) {
+	//  _aligned_free(transferbuff);
+	//  transferbuff = NULL;
+  //}
 
   if(this->use_threading) {
 	  pthread_exit(NULL);
@@ -569,10 +574,6 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
     _x_stream_info_set(this->stream, XINE_STREAM_INFO_FRAME_DURATION, (this->reported_video_step = this->video_step));
   }
 
-  if(this->use_threading) {
-    crystalhd_video_render(this, NULL);
-  }
-
   if(buf->decoder_flags & BUF_FLAG_STDHEADER) {
     //lprintf("BUF_FLAG_STDHEADER\n");
     memcpy ( &this->bih, buf->content, sizeof(xine_bmiheader) );
@@ -748,13 +749,17 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
           }
           */
 
-          if(this->use_threading)
-            pthread_mutex_lock(&this->rec_mutex);
+          //if(this->use_threading)
+          //  pthread_mutex_lock(&this->rec_mutex);
 
           crystalhd_send_data(this, hDevice, poutbuf, poutbuf_size, this->pts);
 
-          if(this->use_threading)
-            pthread_mutex_unlock(&this->rec_mutex);
+          if(this->use_threading) {
+            crystalhd_video_render(this, NULL);
+          }
+
+          //if(this->use_threading)
+          //  pthread_mutex_unlock(&this->rec_mutex);
 
           if(!this->use_threading) {
             crystalhd_video_rec_thread(this);
@@ -791,7 +796,7 @@ static void crystalhd_video_clear_all_pts(crystalhd_video_decoder_t *this) {
 	}
 
 	if(hDevice) {
-		DtsFlushInput(hDevice, 1);
+		DtsFlushInput(hDevice, 2);
 	}
 
 }
@@ -802,12 +807,12 @@ static void crystalhd_video_clear_worker_buffers(crystalhd_video_decoder_t *this
   //lprintf("crystalhd_video_clear_worker_buffers enter\n");
 
 	if(hDevice) {
-		DtsFlushInput(hDevice, 1);
+		DtsFlushInput(hDevice, 2);
 	}
 
 	while ((ite = xine_list_front(this->image_buffer)) != NULL) {
 		image_buffer_t	*img = xine_list_get_value(this->image_buffer, ite);
-		_aligned_free(img->image);
+		free(img->image);
 		free(img);
 		xine_list_remove(this->image_buffer, ite);
 	}
