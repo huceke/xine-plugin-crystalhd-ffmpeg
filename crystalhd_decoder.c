@@ -175,7 +175,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
   BC_DTS_PROC_OUT		procOut;
 	unsigned char   	*transferbuff = NULL;
 	int								decoder_timeout = 16;
-  //int               mutex_lock = 0;
+  int               mutex_lock = 0;
 
 	while(!this->rec_thread_stop) {
 	
@@ -185,6 +185,13 @@ void* crystalhd_video_rec_thread (void *this_gen) {
       }
       msleep(10);
       continue;
+    }
+
+    if(this->use_threading) {
+      mutex_lock = pthread_mutex_trylock(&this->rec_mutex);
+      if(mutex_lock == EBUSY) {
+        continue;
+      }
     }
 
 		/* read driver status. we need the frame ready count from it */
@@ -346,6 +353,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 		}
 
     if(this->use_threading) {
+      pthread_mutex_unlock(&this->rec_mutex);
       msleep(5);
     } else {
       break;
@@ -740,7 +748,13 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
           }
           */
 
+          if(this->use_threading)
+            pthread_mutex_lock(&this->rec_mutex);
+
           crystalhd_send_data(this, hDevice, poutbuf, poutbuf_size, this->pts);
+
+          if(this->use_threading)
+            pthread_mutex_unlock(&this->rec_mutex);
 
           if(!this->use_threading) {
             crystalhd_video_rec_thread(this);
