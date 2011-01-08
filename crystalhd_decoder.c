@@ -162,7 +162,7 @@ static void crystalhd_video_render (crystalhd_video_decoder_t *this, image_buffe
   }
 
   if(img != NULL && this->use_threading) {
-  	free(img->image);
+  	_aligned_free(img->image);
     free(img);
   }
 }
@@ -211,7 +211,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 			  procOut.PicInfo.picture_number = 0;
 	
 			  if(transferbuff == NULL) {
-				  transferbuff = malloc(this->y_size);
+				  transferbuff = _aligned_malloc(this->y_size, 16);
 		  	}
 			  procOut.Ybuff = transferbuff;
 
@@ -349,7 +349,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 	}
 
   if(transferbuff) {
-	  free(transferbuff);
+	  _aligned_free(transferbuff);
 	  transferbuff = NULL;
   }
 
@@ -795,7 +795,7 @@ static void crystalhd_video_clear_worker_buffers(crystalhd_video_decoder_t *this
 
 	while ((ite = xine_list_front(this->image_buffer)) != NULL) {
 		image_buffer_t	*img = xine_list_get_value(this->image_buffer, ite);
-		free(img->image);
+		_aligned_free(img->image);
 		free(img);
 		xine_list_remove(this->image_buffer, ite);
 	}

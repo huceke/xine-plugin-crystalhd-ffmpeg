@@ -23,7 +23,27 @@
 #include "crystalhd_decoder.h"
 #include "crystalhd_hw.h"
 
-#include <libavutil/mem.h>
+#undef ALIGN
+#define ALIGN(value, alignment) (((value)+(alignment-1))&~(alignment-1))
+
+void *_aligned_malloc(size_t s, size_t alignTo) {
+
+  char *pFull = (char*)malloc(s + alignTo + sizeof(char *));
+  char *pAlligned = (char *)ALIGN(((unsigned long)pFull + sizeof(char *)), alignTo);
+
+  *(char **)(pAlligned - sizeof(char*)) = pFull;
+
+  return(pAlligned);
+}
+
+void _aligned_free(void *p) {
+  if (!p)
+    return;
+
+  char *pFull = *(char **)(((char *)p) - sizeof(char *));
+  free(pFull);
+}
+
 
 const char* g_DtsStatusText[] = {
         "BC_STS_SUCCESS",
@@ -222,7 +242,7 @@ BC_STATUS crystalhd_send_data(crystalhd_video_decoder_t *this, HANDLE hDevice, u
 
   BC_STATUS ret;
          
-  uint8_t *sendbuf = av_malloc(buf_len);
+  uint8_t *sendbuf = _aligned_malloc(buf_len, 16);
   memcpy(sendbuf, buf, buf_len);
 
   do {
@@ -236,7 +256,7 @@ BC_STATUS crystalhd_send_data(crystalhd_video_decoder_t *this, HANDLE hDevice, u
     }
   } while(ret != BC_STS_SUCCESS);
 
-  av_free(sendbuf);
+  _aligned_free(sendbuf);
 
   return ret;
 
