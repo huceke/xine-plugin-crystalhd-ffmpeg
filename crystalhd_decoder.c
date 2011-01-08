@@ -217,9 +217,13 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 
 			  procOut.PoutFlags = procOut.PoutFlags & 0xff;
 	
+        //pthread_mutex_lock(&this->rec_mutex);
   			ret = DtsProcOutput(hDevice, decoder_timeout, &procOut);
+        //pthread_mutex_unlock(&this->rec_mutex);
       } else {	
+        //pthread_mutex_lock(&this->rec_mutex);
   			ret = DtsProcOutputNoCopy(hDevice, decoder_timeout, &procOut);
+        //pthread_mutex_unlock(&this->rec_mutex);
       }
 
 			/* print statistics */
@@ -475,7 +479,6 @@ static void crystalhd_init_video_codec (crystalhd_video_decoder_t *this, buf_ele
       xprintf(this->xine, XINE_VERBOSITY_LOG,"crystalhd: error opening codec %d\n", this->codec_type);
       return;
     } 
-
     avcodec_open(this->av_context, this->av_codec);
 
     if (this->av_codec->id == CODEC_ID_VC1 &&
@@ -556,10 +559,6 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
 
   if (this->video_step != this->reported_video_step){
     _x_stream_info_set(this->stream, XINE_STREAM_INFO_FRAME_DURATION, (this->reported_video_step = this->video_step));
-  }
-
-  if(!this->use_threading) {
-    crystalhd_video_rec_thread(this);
   }
 
   if(this->use_threading) {
@@ -741,8 +740,13 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
           }
           */
 
+          //pthread_mutex_lock(&this->rec_mutex);
           crystalhd_send_data(this, hDevice, poutbuf, poutbuf_size, this->pts);
+          //pthread_mutex_unlock(&this->rec_mutex);
 
+          if(!this->use_threading) {
+            crystalhd_video_rec_thread(this);
+          }
 
         }
 
@@ -787,11 +791,10 @@ static void crystalhd_video_clear_worker_buffers(crystalhd_video_decoder_t *this
 
   //lprintf("crystalhd_video_clear_worker_buffers enter\n");
 
-  /*
+  //pthread_mutex_lock(&this->rec_mutex);
 	if(hDevice) {
 		DtsFlushInput(hDevice, 1);
 	}
-  */
 
 	while ((ite = xine_list_front(this->image_buffer)) != NULL) {
 		image_buffer_t	*img = xine_list_get_value(this->image_buffer, ite);
@@ -799,6 +802,7 @@ static void crystalhd_video_clear_worker_buffers(crystalhd_video_decoder_t *this
 		free(img);
 		xine_list_remove(this->image_buffer, ite);
 	}
+  //pthread_mutex_unlock(&this->rec_mutex);
 
   //lprintf("crystalhd_video_clear_worker_buffers leave\n");
 }
@@ -849,10 +853,12 @@ static void crystalhd_video_reset (video_decoder_t *this_gen) {
 
   this->last_image        = 0;
   this->av_got_picture    = 0;
+  this->size              = 0;
 
 	crystalhd_video_clear_worker_buffers(this);
 
-  this->decoder_init      = 0;
+  //this->decoder_init_mode      = 1;
+  //this->decoder_init           = 0;
 
   this->reset = VO_NEW_SEQUENCE_FLAG;
 
