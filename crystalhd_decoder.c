@@ -175,6 +175,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
   BC_DTS_PROC_OUT		procOut;
 	unsigned char   	*transferbuff = NULL;
 	int								decoder_timeout = 16;
+  //int               mutex_lock = 0;
 
 	while(!this->rec_thread_stop) {
 	
@@ -255,6 +256,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 						//this->ratio = set_ratio(this->width, this->height, procOut.PicInfo.aspect_ratio);
             //this->video_step = set_video_step(procOut.PicInfo.frame_rate);
             set_video_params(this);
+            this->last_image = 0;
 	   	   	}
 					break;
 				case BC_STS_SUCCESS:
@@ -319,9 +321,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
               if(this->use_threading) {
   							transferbuff = NULL;
 
-	  	          //pthread_mutex_lock(&this->rec_mutex);
 		  					xine_list_push_back(this->image_buffer, img);
-		            //pthread_mutex_unlock(&this->rec_mutex);
               } else {
                 crystalhd_video_render(this, img);
               }
@@ -350,6 +350,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
     } else {
       break;
    }
+
 	}
 
   if(transferbuff) {
@@ -514,7 +515,6 @@ static void crystalhd_init_video_codec (crystalhd_video_decoder_t *this, buf_ele
   
 static int get_buffer_frame(AVCodecContext *av_context, AVFrame *av_frame)
 {
-  //av_frame->pts = av_context->opaque->pts;
   return avcodec_default_get_buffer( av_context, av_frame );
 }
 
@@ -740,9 +740,7 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
           }
           */
 
-          //pthread_mutex_lock(&this->rec_mutex);
           crystalhd_send_data(this, hDevice, poutbuf, poutbuf_size, this->pts);
-          //pthread_mutex_unlock(&this->rec_mutex);
 
           if(!this->use_threading) {
             crystalhd_video_rec_thread(this);
@@ -778,11 +776,9 @@ static void crystalhd_video_clear_all_pts(crystalhd_video_decoder_t *this) {
     img->pts = 0;
 	}
 
-  /*
 	if(hDevice) {
 		DtsFlushInput(hDevice, 1);
 	}
-  */
 
 }
 
@@ -791,7 +787,6 @@ static void crystalhd_video_clear_worker_buffers(crystalhd_video_decoder_t *this
 
   //lprintf("crystalhd_video_clear_worker_buffers enter\n");
 
-  //pthread_mutex_lock(&this->rec_mutex);
 	if(hDevice) {
 		DtsFlushInput(hDevice, 1);
 	}
@@ -802,7 +797,6 @@ static void crystalhd_video_clear_worker_buffers(crystalhd_video_decoder_t *this
 		free(img);
 		xine_list_remove(this->image_buffer, ite);
 	}
-  //pthread_mutex_unlock(&this->rec_mutex);
 
   //lprintf("crystalhd_video_clear_worker_buffers leave\n");
 }
@@ -857,8 +851,8 @@ static void crystalhd_video_reset (video_decoder_t *this_gen) {
 
 	crystalhd_video_clear_worker_buffers(this);
 
+  this->decoder_init           = 0;
   //this->decoder_init_mode      = 1;
-  //this->decoder_init           = 0;
 
   this->reset = VO_NEW_SEQUENCE_FLAG;
 
