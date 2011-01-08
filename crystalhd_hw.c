@@ -23,6 +23,8 @@
 #include "crystalhd_decoder.h"
 #include "crystalhd_hw.h"
 
+#include <libavutil/mem.h>
+
 const char* g_DtsStatusText[] = {
         "BC_STS_SUCCESS",
         "BC_STS_INV_ARG",
@@ -220,13 +222,21 @@ BC_STATUS crystalhd_send_data(crystalhd_video_decoder_t *this, HANDLE hDevice, u
 
   BC_STATUS ret;
          
-  ret = DtsProcInput(hDevice, buf, buf_len, pts, 0);
+  uint8_t *sendbuf = av_malloc(buf_len);
+  memcpy(sendbuf, buf, buf_len);
 
-  if (ret == BC_STS_BUSY) {
-    xprintf(this->xine, XINE_VERBOSITY_LOG,"crystalhd: decoder BC_STS_BUSY\n");
-    DtsFlushInput(hDevice, 1);
-    ret = DtsProcInput(hDevice, buf, buf_len, pts, 0);
-  }
+  do {
+    ret = DtsProcInput(hDevice, sendbuf, buf_len, pts, 0);
+
+    if (ret == BC_STS_BUSY) {
+      xprintf(this->xine, XINE_VERBOSITY_LOG,"crystalhd: decoder BC_STS_BUSY\n");
+      //DtsFlushInput(hDevice, 1);
+      //ret = DtsProcInput(hDevice, buf, buf_len, pts, 0);
+      msleep(10);
+    }
+  } while(ret != BC_STS_SUCCESS);
+
+  av_free(sendbuf);
 
   return ret;
 

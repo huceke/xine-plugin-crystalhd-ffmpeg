@@ -774,9 +774,11 @@ static void crystalhd_video_clear_all_pts(crystalhd_video_decoder_t *this) {
     img->pts = 0;
 	}
 
+  /*
 	if(hDevice) {
 		DtsFlushInput(hDevice, 1);
 	}
+  */
 
 }
 
@@ -785,9 +787,11 @@ static void crystalhd_video_clear_worker_buffers(crystalhd_video_decoder_t *this
 
   //lprintf("crystalhd_video_clear_worker_buffers enter\n");
 
+  /*
 	if(hDevice) {
 		DtsFlushInput(hDevice, 1);
 	}
+  */
 
 	while ((ite = xine_list_front(this->image_buffer)) != NULL) {
 		image_buffer_t	*img = xine_list_get_value(this->image_buffer, ite);

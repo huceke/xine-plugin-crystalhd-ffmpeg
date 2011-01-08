@@ -174,5 +174,6 @@ typedef struct crystalhd_video_decoder_s {
 void *crystalhd_video_rec_thread (void *this_gen);
 void crystalhd_decode_package (uint8_t *buf, uint32_t size);
 void set_video_params (crystalhd_video_decoder_t *this);
+int msleep(unsigned long milisec);
 
 #endif
