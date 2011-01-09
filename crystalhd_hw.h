@@ -40,7 +40,5 @@ HANDLE crystalhd_close(crystalhd_video_decoder_t *this, HANDLE hDevice);
 BC_STATUS crystalhd_send_data(crystalhd_video_decoder_t *this, HANDLE hDevice, uint8_t *buf, uint32_t buf_len, int64_t pts);
 uint64_t set_video_step(uint32_t frame_rate);
 double set_ratio(int width, int height, uint32_t aspect_ratio);
-void *_aligned_malloc(size_t s, size_t alignTo);
-void _aligned_free(void *p);
 
 #endif

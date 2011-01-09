@@ -175,7 +175,8 @@ void* crystalhd_video_rec_thread (void *this_gen) {
   BC_DTS_PROC_OUT		procOut;
 	//unsigned char   	*transferbuff = NULL;
 	int								decoder_timeout = 16;
-  int               mutex_lock = 0;
+  static uint64_t   pts = 0;
+  //int               mutex_lock = 0;
 
 	while(!this->rec_thread_stop) {
 	
@@ -265,6 +266,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
             //this->video_step = set_video_step(procOut.PicInfo.frame_rate);
             set_video_params(this);
             this->last_image = 0;
+            pts = 0;
 	   	   	}
 					break;
 				case BC_STS_SUCCESS:
@@ -277,7 +279,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
             if((procOut.PicInfo.picture_number - this->last_image) > 0 ) {
 
               if(this->extra_logging) {
-                fprintf(stderr,"ReadyListCount %d FreeListCount %d PIBMissCount %d picture_number %d gap %d tiemStamp %" PRId64 " YbuffSz %d YBuffDoneSz %d UVbuffSz %d UVBuffDoneSz %d\n",
+                fprintf(stderr,"ReadyListCount %d FreeListCount %d PIBMissCount %d picture_number %d gap %d timeStamp %" PRId64 " YbuffSz %d YBuffDoneSz %d UVbuffSz %d UVBuffDoneSz %d\n",
 									pStatus.ReadyListCount, pStatus.FreeListCount, pStatus.PIBMissCount, 
 									procOut.PicInfo.picture_number, 
 									procOut.PicInfo.picture_number - this->last_image,
@@ -287,7 +289,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
               }
 
               if((procOut.PicInfo.picture_number - this->last_image) > 1) {
-							  xprintf(this->xine, XINE_VERBOSITY_NONE,"ReadyListCount %d FreeListCount %d PIBMissCount %d picture_number %d gap %d tiemStamp %" PRId64 "\n",
+							  xprintf(this->xine, XINE_VERBOSITY_NONE,"ReadyListCount %d FreeListCount %d PIBMissCount %d picture_number %d gap %d timeStamp %" PRId64 "\n",
 									pStatus.ReadyListCount, pStatus.FreeListCount, pStatus.PIBMissCount, 
 									procOut.PicInfo.picture_number, 
 									procOut.PicInfo.picture_number - this->last_image,
@@ -324,7 +326,11 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 
 							img->width = this->width;
 							img->height = this->height;
-							img->pts = procOut.PicInfo.timeStamp;
+              if(procOut.PicInfo.timeStamp) {
+                pts = procOut.PicInfo.timeStamp;
+              }
+							//img->pts = procOut.PicInfo.timeStamp;
+							img->pts = pts;
 						 	img->video_step = this->video_step;
 						 	img->ratio = this->ratio;
 							img->interlaced = this->interlaced;
@@ -453,6 +459,13 @@ static void crystalhd_init_video_decoder (crystalhd_video_decoder_t *this, buf_e
       extradata = this->av_context->extradata;
       extradata_size = this->av_context->extradata_size;
       break;
+    case BUF_VIDEO_MPEG4:
+    case BUF_VIDEO_XVID:
+    case BUF_VIDEO_DIVX5:
+      this->algo = BC_MSUBTYPE_DIVX;
+      extradata = this->av_context->extradata;
+      extradata_size = this->av_context->extradata_size;
+      break;
     default:
       return;
   }
@@ -479,6 +492,11 @@ static void crystalhd_init_video_codec (crystalhd_video_decoder_t *this, buf_ele
       break;
     case BUF_VIDEO_MPEG:
       this->codec_type = CODEC_ID_MPEG2VIDEO;
+      break;
+    case BUF_VIDEO_MPEG4:
+    case BUF_VIDEO_XVID:
+    case BUF_VIDEO_DIVX5:
+      this->codec_type = CODEC_ID_MPEG4;
       break;
     default:
       return;
@@ -552,6 +570,9 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
   crystalhd_video_decoder_t *this = (crystalhd_video_decoder_t *) this_gen;
   uint8_t *chunk_buf = this->buf;
 
+  //if(!this->pts && buf->pts)
+  //  this->pts = buf->pts;
+
   if(buf->pts)
     this->pts = buf->pts;
 
@@ -624,7 +645,7 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
   	      ((buf->size + FF_INPUT_BUFFER_PADDING_SIZE) < buf->max_size) &&
   	      (buf->decoder_flags & BUF_FLAG_FRAME_END)) {
         /* buf contains a complete frame */
-      /* no memcpy needed */
+        /* no memcpy needed */
         chunk_buf = buf->content;
         this->size = buf->size;
         //lprintf("no memcpy needed to accumulate data\n");
@@ -640,10 +661,11 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
       }
     }
   
+    //if (buf->decoder_flags & BUF_FLAG_FRAME_END)
+    //    lprintf("BUF_FLAG_FRAME_END\n");
+
     if ((buf->decoder_flags & BUF_FLAG_FRAME_END) || (buf->type == BUF_VIDEO_MPEG)) { // ||
         //(buf->type == BUF_VIDEO_VC1) || (buf->type == BUF_VIDEO_WMV9)) {
-
-      //lprintf("BUF_FLAG_FRAME_END\n");
 
       int         len;
       int         offset = 0;
@@ -717,8 +739,6 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
         }
 
         if(poutbuf_size > 0) {
-
-          //lprintf("decode\n");
 
           if(!this->decoder_init_mode) {
             crystalhd_init_video_decoder (this, buf);
@@ -867,6 +887,7 @@ static void crystalhd_video_reset (video_decoder_t *this_gen) {
   this->last_image        = 0;
   this->av_got_picture    = 0;
   this->size              = 0;
+  this->pts               = 0;
 
 	crystalhd_video_clear_worker_buffers(this);
 
@@ -883,6 +904,8 @@ static void crystalhd_video_reset (video_decoder_t *this_gen) {
  */
 static void crystalhd_video_discontinuity (video_decoder_t *this_gen) {
   crystalhd_video_decoder_t *this = (crystalhd_video_decoder_t *) this_gen;
+
+  this->pts               = 0;
 
   crystalhd_video_clear_all_pts(this);
 
@@ -1127,7 +1150,13 @@ void *init_video_plugin (xine_t *xine, void *data) {
  * not exist). Terminate the list with a 0.
  */
 uint32_t video_types[] = {
-  BUF_VIDEO_H264, BUF_VIDEO_VC1, BUF_VIDEO_WMV9, BUF_VIDEO_MPEG,
+  BUF_VIDEO_H264, 
+  BUF_VIDEO_VC1, 
+  BUF_VIDEO_WMV9, 
+  BUF_VIDEO_MPEG, 
+  BUF_VIDEO_MPEG4,
+  BUF_VIDEO_XVID,
+  BUF_VIDEO_DIVX5,
   0
 };
 

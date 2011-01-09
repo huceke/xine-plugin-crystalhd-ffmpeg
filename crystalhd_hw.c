@@ -23,28 +23,6 @@
 #include "crystalhd_decoder.h"
 #include "crystalhd_hw.h"
 
-#undef ALIGN
-#define ALIGN(value, alignment) (((value)+(alignment-1))&~(alignment-1))
-
-void *_aligned_malloc(size_t s, size_t alignTo) {
-
-  char *pFull = (char*)malloc(s + alignTo + sizeof(char *));
-  char *pAlligned = (char *)ALIGN(((unsigned long)pFull + sizeof(char *)), alignTo);
-
-  *(char **)(pAlligned - sizeof(char*)) = pFull;
-
-  return(pAlligned);
-}
-
-void _aligned_free(void *p) {
-  if (!p)
-    return;
-
-  char *pFull = *(char **)(((char *)p) - sizeof(char *));
-  free(pFull);
-}
-
-
 const char* g_DtsStatusText[] = {
         "BC_STS_SUCCESS",
         "BC_STS_INV_ARG",
@@ -242,21 +220,14 @@ BC_STATUS crystalhd_send_data(crystalhd_video_decoder_t *this, HANDLE hDevice, u
 
   BC_STATUS ret;
          
-  uint8_t *sendbuf = _aligned_malloc(buf_len, 16);
-  memcpy(sendbuf, buf, buf_len);
-
   do {
-    ret = DtsProcInput(hDevice, sendbuf, buf_len, pts, 0);
+    ret = DtsProcInput(hDevice, buf, buf_len, pts, 0);
 
     if (ret == BC_STS_BUSY) {
       xprintf(this->xine, XINE_VERBOSITY_LOG,"crystalhd: decoder BC_STS_BUSY\n");
-      //DtsFlushInput(hDevice, 1);
-      //ret = DtsProcInput(hDevice, buf, buf_len, pts, 0);
       msleep(10);
     }
   } while(ret != BC_STS_SUCCESS);
-
-  _aligned_free(sendbuf);
 
   return ret;
 
@@ -266,54 +237,6 @@ uint64_t set_video_step(uint32_t frame_rate) {
 
   uint64_t video_step;
 
-  /*
-  switch(frame_rate) {
-    case vdecFrameRate23_97:
-    case 23970:
-			video_step = 90000/23.976;
-      break;
-    case vdecFrameRate24:
-    case 24000:
-			video_step = 90000/24;
-      break;
-    case vdecFrameRate25:
-    case 25000:
-			video_step = 90000/25;
-      break;
-    case vdecFrameRate29_97:
-    case 29970:
-			video_step = 90000/29.97;
-      break;
-    case vdecFrameRate30:
-    case 30000:
-			video_step = 90000/30;
-      break;
-    case vdecFrameRate50:
-    case 50000:
-			video_step = 90000/50;
-      break;
-    case vdecFrameRate59_94:
-    case 59940:
-			video_step = 90000/59.94;
-      break;
-    case vdecFrameRate60:
-    case 60000:
-			video_step = 90000/60;
-      break;
-    case vdecFrameRate14_985:
-    case 14985:
-			video_step = 90000/14.985;
-      break;
-    case vdecFrameRate7_496:
-    case 7496:
-			video_step = 90000/7.496;
-      break;
-    case vdecFrameRateUnknown:
-    default:
-			video_step = 90000/23.976;
-      break;
-  }
-  */
 	switch(frame_rate) {
 		case vdecRESOLUTION_720p:
 		case vdecRESOLUTION_576p:
