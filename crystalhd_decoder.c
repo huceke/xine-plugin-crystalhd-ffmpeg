@@ -273,9 +273,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 	     	 	if ((procOut.PoutFlags & BC_POUT_FLAGS_PIB_VALID) &&
               procOut.PicInfo.timeStamp == 0) {
             xprintf(this->stream->xine, XINE_VERBOSITY_LOG,"crystalhd_video: timeStamp == 0 picture_number %d\n", procOut.PicInfo.picture_number);
-          }
-
-	     	 	if (procOut.PoutFlags & BC_POUT_FLAGS_PIB_VALID) {
+          } else if (procOut.PoutFlags & BC_POUT_FLAGS_PIB_VALID) {
 	
 						if(this->last_image == 0) {
 							this->last_image = procOut.PicInfo.picture_number;
@@ -731,7 +729,6 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
             poutbuf = &chunk_buf[offset];
             poutbuf_size = this->size;
           }
-          */
           
           if(this->av_got_picture) {
             lprintf("got first decoded picture size %d %lld\n", len, this->av_frame->pts);
@@ -739,6 +736,7 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
             AVFrame *frame = this->av_context->coded_frame;
             
           }
+          */
 
           /* use externally provided video_step or fall back to stream's time_base otherwise */
           video_step_to_use = (this->video_step || !this->av_context->time_base.den)
@@ -776,7 +774,7 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
         }
 
         //if(poutbuf_size > 0 || this->av_got_picture) {
-        if(poutbuf_size > 0) {
+        if(poutbuf_size > 0 || this->av_got_picture) {
 
           if(!this->decoder_init_mode) {
             crystalhd_init_video_decoder (this, buf);
@@ -812,17 +810,17 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
 
           crystalhd_send_data(this, hDevice, poutbuf, poutbuf_size, this->pts);
 
-          if(this->use_threading) {
-            crystalhd_video_render(this, NULL);
-          }
-
           //if(this->use_threading)
           //  pthread_mutex_unlock(&this->rec_mutex);
 
-          if(!this->use_threading) {
-            crystalhd_video_rec_thread(this);
-          }
+        }
 
+        if(this->use_threading) {
+          crystalhd_video_render(this, NULL);
+        }
+
+        if(!this->use_threading) {
+          crystalhd_video_rec_thread(this);
         }
 
         if ((len <= 0) || (len > this->size)) {
