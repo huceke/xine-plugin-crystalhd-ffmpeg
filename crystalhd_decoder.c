@@ -86,20 +86,9 @@ void print_setup(crystalhd_video_decoder_t *this) {
 	xprintf(this->xine, XINE_VERBOSITY_LOG, "this->video_step %d\n", this->video_step);
 	xprintf(this->xine, XINE_VERBOSITY_LOG, "this->reported_video_step %d\n", this->reported_video_step);
 	xprintf(this->xine, XINE_VERBOSITY_LOG, "this->ratio %f\n", this->ratio);
-	xprintf(this->xine, XINE_VERBOSITY_LOG, "this->decoder_25p %d\n", this->decoder_25p);
 }
 
 void set_video_params (crystalhd_video_decoder_t *this) {
-
-  this->decoder_25p = 0;
-
-  if(this->decoder_25p_drop) {
-    if(this->video_step < 3000) {
-      xprintf(this->xine, XINE_VERBOSITY_LOG, "enable frame drop hack\n");
-      this->decoder_25p = 1;
-      this->video_step = this->video_step * 2;
-    }
-  }
 
 	_x_stream_info_set( this->stream, XINE_STREAM_INFO_VIDEO_WIDTH, this->width );
 	_x_stream_info_set( this->stream, XINE_STREAM_INFO_VIDEO_HEIGHT, this->height );
@@ -302,11 +291,6 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 							if(procOut.PicInfo.picture_number != this->last_image) {
 								this->last_image = procOut.PicInfo.picture_number;
 							}
-
-              /* Hack to drop every second frame */
-              if(this->decoder_25p && (procOut.PicInfo.picture_number % 2)) {
-                continue;
-              }
 
 							image_buffer_t *img = NULL;
               image_buffer_t _img;
@@ -1044,14 +1028,6 @@ void crystalhd_decoder_reopen( void *this_gen, xine_cfg_entry_t *entry )
 	xprintf(this->xine, XINE_VERBOSITY_LOG, "crystalhd_video: decoder_reopen %d\n", this->decoder_reopen);
 }
 
-void crystalhd_decoder_25p_drop( void *this_gen, xine_cfg_entry_t *entry )
-{
-  crystalhd_video_decoder_t  *this  = (crystalhd_video_decoder_t *) this_gen;
-
-  this->decoder_25p_drop = entry->num_value;
-	xprintf(this->xine, XINE_VERBOSITY_LOG, "crystalhd_video: decoder_25p_drop %d\n", this->decoder_25p_drop);
-}
-
 /*
  * This function allocates, initializes, and returns a private video
  * decoder structure.
@@ -1100,17 +1076,11 @@ static video_decoder_t *crystalhd_video_open_plugin (video_decoder_class_t *clas
     _("due a bug in bcm70015 set this to true for bcm70015.\n"),
     10, crystalhd_decoder_reopen, this );
 
-  this->decoder_25p_drop = config->register_bool( config, "video.crystalhd_decoder.decoder_25p_drop", 0,
-    _("crystalhd_video: on >=50p drop every second frame"),
-    _("on >=50p drop every second frame. This is a hack for slow gfx cards.\n"),
-    10, crystalhd_decoder_25p_drop, this );
-
 	xprintf(this->xine, XINE_VERBOSITY_LOG, "crystalhd_video: scaling_enable %d\n", this->scaling_enable);
 	xprintf(this->xine, XINE_VERBOSITY_LOG, "crystalhd_video: scaling_width  %d\n", this->scaling_width);
 	xprintf(this->xine, XINE_VERBOSITY_LOG, "crystalhd_video: use_threading  %d\n", this->use_threading);
 	xprintf(this->xine, XINE_VERBOSITY_LOG, "crystalhd_video: extra_logging  %d\n", this->extra_logging);
 	xprintf(this->xine, XINE_VERBOSITY_LOG, "crystalhd_video: decoder_reopen %d\n", this->decoder_reopen);
-	xprintf(this->xine, XINE_VERBOSITY_LOG, "crystalhd_video: decoder_25p_drop %d\n", this->decoder_25p_drop);
 
   this->video_step  	    = 0;
   this->reported_video_step = 0;
@@ -1129,8 +1099,6 @@ static video_decoder_t *crystalhd_video_open_plugin (video_decoder_class_t *clas
 	this->image_buffer      = xine_list_new();
 
   this->reset             = VO_NEW_SEQUENCE_FLAG;
-
-  this->decoder_25p       = 0;
 
 	crystalhd_video_setup_workers(this);
 

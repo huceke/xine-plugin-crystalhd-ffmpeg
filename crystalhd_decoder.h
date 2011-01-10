@@ -53,12 +53,6 @@ extern HANDLE hDevice;
 
 extern const char* g_DtsStatusText[];
 
-typedef struct decoder_buffer_s {
-	uint8_t		*bytestream;
- 	uint32_t	bytestream_bytes;
-	uint64_t   pts;
-} decoder_buffer_t;
-
 typedef struct image_buffer_s {
 	uint8_t		*image;
  	uint32_t	image_bytes;
@@ -72,19 +66,6 @@ typedef struct image_buffer_s {
 	uint32_t	picture_number;
   uint32_t  stride;
 } image_buffer_t;
-
-/* MGED Picture */
-typedef struct {
-  int                     slices_count, slices_count2;
-  uint8_t                 *slices;
-  int                     slices_size;
-  int                     slices_pos, slices_pos_top;
-
-  int                     progressive_frame;
-  int                     state;
-  int                     picture_structure;
-} picture_mpeg_t;
-
 
 typedef struct {
   video_decoder_class_t   decoder_class;
@@ -144,8 +125,6 @@ typedef struct crystalhd_video_decoder_s {
   int               use_threading;
   int               extra_logging;
   int               decoder_reopen;
-  int               decoder_25p;
-  int               decoder_25p_drop;
 
   AVCodecContext    *av_context;
   AVFrame           *av_frame;
