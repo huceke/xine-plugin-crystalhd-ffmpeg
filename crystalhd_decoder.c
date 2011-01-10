@@ -718,9 +718,6 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
           
           if(this->av_got_picture) {
             lprintf("got first decoded picture size %d %lld\n", len, this->av_frame->pts);
-
-            AVFrame *frame = this->av_context->coded_frame;
-            
           }
           */
 
@@ -759,7 +756,6 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
           }
         }
 
-        //if(poutbuf_size > 0 || this->av_got_picture) {
         if(poutbuf_size > 0 || this->av_got_picture) {
 
           if(!this->decoder_init_mode) {
