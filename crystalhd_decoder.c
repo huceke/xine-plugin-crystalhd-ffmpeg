@@ -261,7 +261,9 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 				case BC_STS_SUCCESS:
 	     	 	if ((procOut.PoutFlags & BC_POUT_FLAGS_PIB_VALID) &&
               procOut.PicInfo.timeStamp == 0) {
-            xprintf(this->stream->xine, XINE_VERBOSITY_LOG,"crystalhd_video: timeStamp == 0 picture_number %d\n", procOut.PicInfo.picture_number);
+            if(this->extra_logging) {
+              xprintf(this->stream->xine, XINE_VERBOSITY_LOG,"crystalhd_video: timeStamp == 0 picture_number %d\n", procOut.PicInfo.picture_number);
+            }
           } else if (procOut.PoutFlags & BC_POUT_FLAGS_PIB_VALID) {
 	
 						if(this->last_image == 0) {
@@ -278,14 +280,14 @@ void* crystalhd_video_rec_thread (void *this_gen) {
                   procOut.PicInfo.timeStamp,
                   procOut.YbuffSz, procOut.YBuffDoneSz, 
                   procOut.UVbuffSz, procOut.UVBuffDoneSz);
-              }
 
-              if((procOut.PicInfo.picture_number - this->last_image) > 1) {
-							  xprintf(this->xine, XINE_VERBOSITY_NONE,"ReadyListCount %d FreeListCount %d PIBMissCount %d picture_number %d gap %d timeStamp %" PRId64 "\n",
-									pStatus.ReadyListCount, pStatus.FreeListCount, pStatus.PIBMissCount, 
-									procOut.PicInfo.picture_number, 
-									procOut.PicInfo.picture_number - this->last_image,
-                  procOut.PicInfo.timeStamp);
+                if((procOut.PicInfo.picture_number - this->last_image) > 1) {
+							    xprintf(this->xine, XINE_VERBOSITY_NONE,"ReadyListCount %d FreeListCount %d PIBMissCount %d picture_number %d gap %d timeStamp %" PRId64 "\n",
+									  pStatus.ReadyListCount, pStatus.FreeListCount, pStatus.PIBMissCount, 
+									  procOut.PicInfo.picture_number, 
+									  procOut.PicInfo.picture_number - this->last_image,
+                    procOut.PicInfo.timeStamp);
+                }
               }
 
 							if(procOut.PicInfo.picture_number != this->last_image) {
