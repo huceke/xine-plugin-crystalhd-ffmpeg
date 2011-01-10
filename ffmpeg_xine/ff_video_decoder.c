@@ -1801,7 +1801,6 @@ static void ff_handle_buffer (ff_video_decoder_t *this, buf_element_t *buf) {
 
         //this->av_pkt.size = this->size;
         //this->av_pkt.data = &chunk_buf[offset];
-        //this->av_pkt.data = this->buf;
 
         //len = avcodec_decode_video2 (this->context, this->av_frame, &got_picture, &this->av_pkt);
 

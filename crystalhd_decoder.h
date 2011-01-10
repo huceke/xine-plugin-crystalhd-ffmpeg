@@ -169,6 +169,8 @@ typedef struct crystalhd_video_decoder_s {
   BCM_STREAM_TYPE stream_type;
   BCM_VIDEO_ALGO algo;
 
+  buf_element_t     *last_buf;
+
 } crystalhd_video_decoder_t;
 
 void *crystalhd_video_rec_thread (void *this_gen);

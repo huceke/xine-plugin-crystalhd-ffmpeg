@@ -57,7 +57,7 @@ HANDLE crystalhd_open (int use_threading) {
 
 	BC_STATUS res;
 	uint32_t mode = DTS_PLAYBACK_MODE | DTS_LOAD_FILE_PLAY_FW | DTS_PLAYBACK_DROP_RPT_MODE |
-                  DTS_DFLT_RESOLUTION(vdecRESOLUTION_720p23_976) | DTS_SKIP_TX_CHK_CPB;
+                  DTS_DFLT_RESOLUTION(vdecRESOLUTION_1080p23_976) | DTS_SKIP_TX_CHK_CPB;
   if(!use_threading) {
     mode |= DTS_SINGLE_THREADED_MODE;
   }
@@ -134,14 +134,16 @@ void crystalhd_input_format (crystalhd_video_decoder_t *this, HANDLE hDevice, BC
   memset(&pInputFormat, 0, sizeof(BC_INPUT_FORMAT));
 
   pInputFormat.FGTEnable = FALSE;
-  pInputFormat.MetaDataEnable = FALSE;
   pInputFormat.Progressive = TRUE;
   pInputFormat.OptFlags = 0x80000000 | vdecFrameRate23_97;
+  if(!this->use_threading) {
+    pInputFormat.OptFlags |= 0x40;
+  }
   pInputFormat.startCodeSz = startCodeSz;
   pInputFormat.mSubtype = mSubtype;
   pInputFormat.pMetaData = pMetaData;
   pInputFormat.metaDataSz = metaDataSz;
-  pInputFormat.MetaDataEnable = TRUE;
+  //pInputFormat.MetaDataEnable = TRUE;
   pInputFormat.width = width;
   pInputFormat.height = height;
 
@@ -219,15 +221,28 @@ HANDLE crystalhd_start (crystalhd_video_decoder_t *this, HANDLE hDevice,
 BC_STATUS crystalhd_send_data(crystalhd_video_decoder_t *this, HANDLE hDevice, uint8_t *buf, uint32_t buf_len, int64_t pts) {
 
   BC_STATUS ret;
-         
+  uint8_t input_full = 0;
+    
   do {
-    ret = DtsProcInput(hDevice, buf, buf_len, pts, 0);
+    int32_t tx_free = (int32_t)DtsTxFreeSize(hDevice);
+    if (buf_len < tx_free - 1024) {
 
-    if (ret == BC_STS_BUSY) {
-      xprintf(this->xine, XINE_VERBOSITY_LOG,"crystalhd: decoder BC_STS_BUSY\n");
-      msleep(10);
+      ret = DtsProcInput(hDevice, buf, buf_len, pts, 0);
+
+      //xprintf(this->xine, XINE_VERBOSITY_LOG,"crystalhd: send bytes %d\n", buf_len);
+
+      if (ret == BC_STS_BUSY) {
+        xprintf(this->xine, XINE_VERBOSITY_LOG,"crystalhd: busy\n");
+        msleep(10);
+        input_full = 1;
+      } else {
+        input_full = 0;
+      }
+    } else {
+      xprintf(this->xine, XINE_VERBOSITY_LOG,"crystalhd: input buffer full\n");
+      input_full = 1;
     }
-  } while(ret != BC_STS_SUCCESS);
+  } while (input_full == 1);
 
   return ret;
 
