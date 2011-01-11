@@ -244,7 +244,7 @@ BC_STATUS crystalhd_send_data(crystalhd_video_decoder_t *this, HANDLE hDevice, u
     } else {
       xprintf(this->xine, XINE_VERBOSITY_LOG,"crystalhd: input buffer full input %d tx_free %d \n", buf_len, tx_free);
       msleep(100);
-      input_full = 0;
+      input_full = 1;
     }
   } while (input_full == 1);
 
