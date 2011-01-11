@@ -967,7 +967,7 @@ static void crystalhd_video_dispose (video_decoder_t *this_gen) {
   if(this->av_parser)
   {
     av_parser_close(this->av_parser);
-    av_free( this->av_parser );
+    this->av_parser = NULL;
   }
 
   if (this->buf)
