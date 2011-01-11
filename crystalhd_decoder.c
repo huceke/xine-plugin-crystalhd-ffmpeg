@@ -192,6 +192,9 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 
 		if( ret == BC_STS_SUCCESS && pStatus.ReadyListCount) {
 
+    int i;
+    for(i = 0; i < pStatus.ReadyListCount; i++) {
+
 			memset(&procOut, 0, sizeof(BC_DTS_PROC_OUT));
 
 		  if(this->interlaced) {
@@ -351,6 +354,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 	       	break;
 	   	}
 		}
+    }
 
     if(this->use_threading) {
       //pthread_mutex_unlock(&this->rec_mutex);
@@ -449,8 +453,13 @@ static void crystalhd_init_video_decoder (crystalhd_video_decoder_t *this, buf_e
     case BUF_VIDEO_MPEG:
       lprintf("BUF_VIDEO_MPEG\n");
       this->algo = BC_MSUBTYPE_MPEG2VIDEO;
+      /*
       extradata = this->av_context->extradata;
       extradata_size = this->av_context->extradata_size;
+      */
+      extradata = NULL;
+      extradata_size = 0;
+      startcode_size = 0;
       break;
     case BUF_VIDEO_MPEG4:
       lprintf("BUF_VIDEO_MPEG4\n");
@@ -533,6 +542,7 @@ static void crystalhd_init_video_codec (crystalhd_video_decoder_t *this, buf_ele
       xprintf(this->xine, XINE_VERBOSITY_LOG,"crystalhd: parser for codec %d not found\n", this->codec_type);
     } else {
       this->av_parser->flags |= PARSER_FLAG_COMPLETE_FRAMES;
+      this->av_parser->fetch_timestamp = 1;
     }
 
     pthread_mutex_unlock(&ffmpeg_lock);
@@ -548,6 +558,7 @@ static void crystalhd_init_video_codec (crystalhd_video_decoder_t *this, buf_ele
     _x_stream_info_get(this->stream, XINE_STREAM_INFO_VIDEO_FOURCC);
 
   this->av_context->workaround_bugs = 1;
+  //this->av_context->skip_loop_filter = AVDISCARD_ALL;
 }
   
 static int get_buffer_frame(AVCodecContext *av_context, AVFrame *av_frame)
@@ -673,7 +684,7 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
     if ((buf->decoder_flags & BUF_FLAG_FRAME_END) || (buf->type == BUF_VIDEO_MPEG)) { // ||
         //(buf->type == BUF_VIDEO_VC1) || (buf->type == BUF_VIDEO_WMV9)) {
 
-      int         len;
+      int         len = 0;
       int         offset = 0;
       int         video_step_to_use = this->video_step;
 
@@ -699,7 +710,6 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
         /* Decode first frame in software */
         if(!this->av_got_picture) {
           AVPacket         av_pkt;
-
           av_init_packet(&av_pkt);
           av_pkt.size = this->size;
           av_pkt.data = &chunk_buf[offset];
@@ -715,11 +725,11 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
             poutbuf = &chunk_buf[offset];
             poutbuf_size = this->size;
           }
+          */
           
           if(this->av_got_picture) {
-            lprintf("got first decoded picture size %d %lld\n", len, this->av_frame->pts);
+            lprintf("got first decoded picture size %d\n", len);
           }
-          */
 
           /* use externally provided video_step or fall back to stream's time_base otherwise */
           video_step_to_use = (this->video_step || !this->av_context->time_base.den)
@@ -756,7 +766,14 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
           }
         }
 
-        if(poutbuf_size > 0 || this->av_got_picture) {
+        //if(poutbuf_size > 0 || this->av_got_picture) {
+        if(poutbuf_size > 0 && poutbuf) {
+
+          /*
+          if(this->av_parser) {
+            printf("this->av_context->has_b_frames %d\n", this->av_context->has_b_frames);
+          }
+          */
 
           if(!this->decoder_init_mode) {
             crystalhd_init_video_decoder (this, buf);
@@ -790,19 +807,19 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
           //if(this->use_threading)
           //  pthread_mutex_lock(&this->rec_mutex);
 
+          if(this->use_threading) {
+            crystalhd_video_render(this, NULL);
+          }
+
+          if(!this->use_threading) {
+            crystalhd_video_rec_thread(this);
+          }
+
           crystalhd_send_data(this, hDevice, poutbuf, poutbuf_size, this->pts);
 
           //if(this->use_threading)
           //  pthread_mutex_unlock(&this->rec_mutex);
 
-        }
-
-        if(this->use_threading) {
-          crystalhd_video_render(this, NULL);
-        }
-
-        if(!this->use_threading) {
-          crystalhd_video_rec_thread(this);
         }
 
         if ((len <= 0) || (len > this->size)) {
@@ -911,7 +928,7 @@ static void crystalhd_video_reset (video_decoder_t *this_gen) {
 
   this->decoder_init           = 0;
   //this->decoder_init_mode      = 1;
-
+  
   this->reset = VO_NEW_SEQUENCE_FLAG;
 
 	xprintf(this->xine, XINE_VERBOSITY_LOG, "crystalhd_video: crystalhd_video_reset\n");
@@ -981,7 +998,7 @@ static void crystalhd_video_dispose (video_decoder_t *this_gen) {
   if (this->m_chd_params.sps_pps_buf)
     free(this->m_chd_params.sps_pps_buf);
   this->m_chd_params.sps_pps_buf = NULL;
-    
+
 	xprintf(this->xine, XINE_VERBOSITY_LOG, "crystalhd_video: crystalhd_video_dispose\n");
   free (this);
 }
