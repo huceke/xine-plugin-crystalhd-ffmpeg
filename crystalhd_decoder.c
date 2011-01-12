@@ -192,9 +192,6 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 
 		if( ret == BC_STS_SUCCESS && pStatus.ReadyListCount) {
 
-    //int i;
-    //for(i = 0; i < pStatus.ReadyListCount; i++) {
-
 			memset(&procOut, 0, sizeof(BC_DTS_PROC_OUT));
 
 		  if(this->interlaced) {
@@ -305,7 +302,6 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 							  img = malloc(sizeof(image_buffer_t));
 							  //img->image = transferbuff;
 							  //img->image_bytes = procOut.YbuffSz;
-							  //img->image_bytes = procOut.YBuffDoneSz + procOut.UVbuffSz;
 							  img->image_bytes = this->width * this->height * 2;
 							  img->image = malloc(img->image_bytes);
                 xine_fast_memcpy(img->image, procOut.Ybuff, img->image_bytes);
@@ -329,7 +325,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 							img->picture_number = procOut.PicInfo.picture_number;
 
               if(this->use_threading) {
-  						//	transferbuff = NULL;
+  							//transferbuff = NULL;
 
 		  					xine_list_push_back(this->image_buffer, img);
               } else {
@@ -353,7 +349,6 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 					}
 	       	break;
 	   	}
-		//}
     }
 
     if(this->use_threading) {
@@ -366,7 +361,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 	}
 
   //if(transferbuff) {
-	//  _aligned_free(transferbuff);
+	//  free(transferbuff);
 	//  transferbuff = NULL;
   //}
 
@@ -451,7 +446,6 @@ static void crystalhd_init_video_decoder (crystalhd_video_decoder_t *this, buf_e
       }
       break;
     case BUF_VIDEO_MPEG:
-      lprintf("BUF_VIDEO_MPEG\n");
       this->algo = BC_MSUBTYPE_MPEG2VIDEO;
       /*
       extradata = this->av_context->extradata;
@@ -462,22 +456,16 @@ static void crystalhd_init_video_decoder (crystalhd_video_decoder_t *this, buf_e
       startcode_size = 0;
       break;
     case BUF_VIDEO_MPEG4:
-      lprintf("BUF_VIDEO_MPEG4\n");
-      this->algo = BC_MSUBTYPE_DIVX;
-      extradata = this->av_context->extradata;
-      extradata_size = this->av_context->extradata_size;
-      break;
     case BUF_VIDEO_XVID:
-      lprintf("BUF_VIDEO_XVID\n");
-      this->algo = BC_MSUBTYPE_DIVX;
-      extradata = this->av_context->extradata;
-      extradata_size = this->av_context->extradata_size;
-      break;
     case BUF_VIDEO_DIVX5:
-      lprintf("BUF_VIDEO_DIVX5\n");
       this->algo = BC_MSUBTYPE_DIVX;
+      /*
       extradata = this->av_context->extradata;
       extradata_size = this->av_context->extradata_size;
+      */
+      extradata = NULL;
+      extradata_size = 0;
+      startcode_size = 0;
       break;
     default:
       return;
@@ -587,9 +575,6 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
   crystalhd_video_decoder_t *this = (crystalhd_video_decoder_t *) this_gen;
   uint8_t *chunk_buf = this->buf;
 
-  //if(!this->pts && buf->pts)
-  //  this->pts = buf->pts;
-
   if(buf->pts)
     this->pts = buf->pts;
 
@@ -599,6 +584,14 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
   if ( !buf->size )
     return;
   
+  if(this->use_threading) {
+    crystalhd_video_render(this, NULL);
+  }
+
+  if(!this->use_threading) {
+    crystalhd_video_rec_thread(this);
+  }
+
   if (buf->decoder_flags & BUF_FLAG_ASPECT) {
     this->ratio = (double)buf->decoder_info[1]/(double)buf->decoder_info[2];
   }
@@ -716,7 +709,6 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
 
           len = avcodec_decode_video2 (this->av_context, this->av_frame, &this->av_got_picture, &av_pkt);
 
-          /*
           if(this->av_parser) {
             av_parser_parse2(this->av_parser, this->av_context, &poutbuf, &poutbuf_size,
                                &chunk_buf[offset], this->size, AV_NOPTS_VALUE, AV_NOPTS_VALUE, AV_NOPTS_VALUE);
@@ -725,7 +717,6 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
             poutbuf = &chunk_buf[offset];
             poutbuf_size = this->size;
           }
-          */
           
           if(this->av_got_picture) {
             lprintf("got first decoded picture size %d\n", len);
@@ -766,14 +757,8 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
           }
         }
 
-        //if(poutbuf_size > 0 || this->av_got_picture) {
-        if(poutbuf_size > 0 && poutbuf) {
-
-          /*
-          if(this->av_parser) {
-            printf("this->av_context->has_b_frames %d\n", this->av_context->has_b_frames);
-          }
-          */
+        if(poutbuf_size > 0 || this->av_got_picture) {
+        //if(poutbuf_size > 0 && poutbuf) {
 
           if(!this->decoder_init_mode) {
             crystalhd_init_video_decoder (this, buf);
@@ -789,9 +774,7 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
             this->bitstream_convert = 1;
 
           }
-          */
 
-          /*
           if(this->bitstream_convert) {
             bitstream_convert(this, poutbuf, poutbuf_size, &psendbuf, &psendbuf_size);
 
@@ -806,14 +789,6 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
 
           //if(this->use_threading)
           //  pthread_mutex_lock(&this->rec_mutex);
-
-          if(this->use_threading) {
-            crystalhd_video_render(this, NULL);
-          }
-
-          if(!this->use_threading) {
-            crystalhd_video_rec_thread(this);
-          }
 
           crystalhd_send_data(this, hDevice, poutbuf, poutbuf_size, this->pts);
 
@@ -839,10 +814,6 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
         }
       }
     }
-  }
-
-  if(this->use_threading) {
-    crystalhd_video_render(this, NULL);
   }
 }
 
