@@ -192,8 +192,8 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 
 		if( ret == BC_STS_SUCCESS && pStatus.ReadyListCount) {
 
-    int i;
-    for(i = 0; i < pStatus.ReadyListCount; i++) {
+    //int i;
+    //for(i = 0; i < pStatus.ReadyListCount; i++) {
 
 			memset(&procOut, 0, sizeof(BC_DTS_PROC_OUT));
 
@@ -353,7 +353,7 @@ void* crystalhd_video_rec_thread (void *this_gen) {
 					}
 	       	break;
 	   	}
-		}
+		//}
     }
 
     if(this->use_threading) {
@@ -840,6 +840,10 @@ static void crystalhd_video_decode_data (video_decoder_t *this_gen,
       }
     }
   }
+
+  if(this->use_threading) {
+    crystalhd_video_render(this, NULL);
+  }
 }
 
 static void crystalhd_video_clear_all_pts(crystalhd_video_decoder_t *this) {
@@ -851,7 +855,7 @@ static void crystalhd_video_clear_all_pts(crystalhd_video_decoder_t *this) {
 	}
 
 	if(hDevice) {
-		DtsFlushInput(hDevice, 4);
+		DtsFlushInput(hDevice, 2);
 	}
 
 }
@@ -862,7 +866,7 @@ static void crystalhd_video_clear_worker_buffers(crystalhd_video_decoder_t *this
   //lprintf("crystalhd_video_clear_worker_buffers enter\n");
 
 	if(hDevice) {
-		DtsFlushInput(hDevice, 4);
+		DtsFlushInput(hDevice, 2);
 	}
 
 	while ((ite = xine_list_front(this->image_buffer)) != NULL) {

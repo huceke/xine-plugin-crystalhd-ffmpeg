@@ -226,8 +226,10 @@ BC_STATUS crystalhd_send_data(crystalhd_video_decoder_t *this, HANDLE hDevice, u
   //if(buf_len == 0) return BC_STS_SUCCESS;
 
   do {
+    /*
     int32_t tx_free = (int32_t)DtsTxFreeSize(hDevice);
     if (buf_len < (tx_free - 1024)) {
+    */
 
       ret = DtsProcInput(hDevice, buf, buf_len, pts, 0);
 
@@ -235,17 +237,19 @@ BC_STATUS crystalhd_send_data(crystalhd_video_decoder_t *this, HANDLE hDevice, u
 
       if (ret == BC_STS_BUSY) {
         xprintf(this->xine, XINE_VERBOSITY_LOG,"crystalhd: busy\n");
-        msleep(100);
+        msleep(10);
         input_full = 1;
       } else {
         input_full = 0;
       }
 
+    /*
     } else {
       xprintf(this->xine, XINE_VERBOSITY_LOG,"crystalhd: input buffer full input %d tx_free %d \n", buf_len, tx_free);
       msleep(100);
       input_full = 1;
     }
+    */
   } while (input_full == 1);
 
   return ret;
